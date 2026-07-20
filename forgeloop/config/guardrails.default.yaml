@@ -1,0 +1,58 @@
+workspace_root: "."
+path_fencing:
+  writes: true
+  reads: true
+  read_allowlist: ["/tmp/", "~/.config/forgeloop/"]
+
+default_decision: RequireApproval
+hitl:
+  approval_timeout_seconds: 86400
+  auto_approve_on_timeout: false
+done_post_check:
+  require_green_tests: false
+
+rules:
+  - id: deny_rm_rf_root
+    tool: [run_shell]
+    match: {command_regex: 'rm\s+(-[a-z]*f[a-z]*\s+)?-?r?f?\s+/(?!tmp\b)'}
+    decision: Deny
+    reason: "destructive rm -rf on root"
+  - id: deny_curl_pipe_sh
+    tool: [run_shell]
+    match: {command_regex: 'curl\s+.*\|\s*(sh|bash)'}
+    decision: Deny
+    reason: "remote code execution"
+  - id: deny_sudo
+    tool: [run_shell]
+    match: {command_regex: '^\s*sudo\b'}
+    decision: Deny
+  - id: deny_write_git_dir
+    tool: [write_file]
+    match: {path_regex: '(\.git/|\.git\\)'}
+    decision: Deny
+    reason: "writing into .git is forbidden"
+  - id: allow_git_readonly
+    tool: [run_shell]
+    match: {command_regex: '^git\s+(status|diff|log|show|ls-files)\b'}
+    decision: Allow
+  - id: approve_all_writes
+    tool: [write_file]
+    match: {any: true}
+    decision: RequireApproval
+    reason: "file write requires approval"
+  - id: approve_shell_default
+    tool: [run_shell]
+    match: {any: true}
+    decision: RequireApproval
+  - id: allow_reads
+    tool: [read_file, list_dir]
+    match: {any: true}
+    decision: Allow
+  - id: allow_tests
+    tool: [run_tests]
+    match: {any: true}
+    decision: Allow
+  - id: allow_done
+    tool: [done]
+    match: {any: true}
+    decision: Allow
