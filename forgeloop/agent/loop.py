@@ -88,6 +88,10 @@ class AgentLoop:
                 self._consec_fail += 1
                 self._history.append(Message(role="user", content=f"[BLOCKED] action denied by guardrail: {decision.reason} (rule: {decision.rule_id})"))
                 self._last_feedback = None
+                st = self._check_and_update()
+                if st != "RUNNING":
+                    return st
+                continue
             elif decision.verdict == "RequireApproval":
                 update_action(self._conn, action_row.id, status="PENDING_APPROVAL", guardrail_decision=json.dumps({"verdict": "RequireApproval", "rule_id": decision.rule_id, "reason": decision.reason}))
                 ar = self._fsm.request(action_id=action_row.id, session_id=self._session_id)

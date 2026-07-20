@@ -77,3 +77,44 @@ def test_loop_loop_breaker(tmp_workspace):
     status = loop.run()
     assert status == "STOPPED_LOOP"
     conn.close()
+
+
+def test_loop_guardrail_deny_breaker(tmp_workspace):
+    conn = connect(tmp_workspace / "t.db")
+    init_schema(conn)
+    cfg = load_config([])
+    cfg.workspace_root = str(tmp_workspace)
+    mock = MockLLMProvider(responses=[
+        '{"thought":"x","tool":"run_shell","args":{"command":"rm -rf /"}}',
+        '{"thought":"x","tool":"run_shell","args":{"command":"rm -rf /"}}',
+        '{"thought":"x","tool":"run_shell","args":{"command":"rm -rf /"}}',
+    ])
+    loop = AgentLoop(llm=mock, llm_config=LLMConfig(model="mock"), config=cfg, registry=_registry(), conn=conn, workspace_root=str(tmp_workspace), task="x")
+    status = loop.run()
+    assert status == "STOPPED_FAILURE_BREAKER"
+    rows = conn.execute("SELECT status FROM actions WHERE tool='run_shell'").fetchall()
+    assert len(rows) == 3
+    assert all(r["status"] == "BLOCKED_BY_GUARDRAIL" for r in rows)
+    conn.close()
+
+
+def test_loop_requireapproval_auto_proceeds(tmp_workspace):
+    conn = connect(tmp_workspace / "t.db")
+    init_schema(conn)
+    cfg = load_config([])
+    cfg.workspace_root = str(tmp_workspace)
+    cfg.done_post_check["require_green_tests"] = False
+    mock = MockLLMProvider(responses=[
+        '{"thought":"x","tool":"write_file","args":{"path":"src/new.py","mode":"overwrite","content":"x"}}',
+        '{"thought":"done","tool":"done","args":{"summary":"ok","success":true}}',
+    ])
+    loop = AgentLoop(llm=mock, llm_config=LLMConfig(model="mock"), config=cfg, registry=_registry(), conn=conn, workspace_root=str(tmp_workspace), task="write then done")
+    status = loop.run()
+    assert status == "COMPLETED"
+    ar = conn.execute("SELECT status FROM approval_requests").fetchall()
+    assert len(ar) == 1
+    assert ar[0]["status"] == "PENDING"
+    act = conn.execute("SELECT status FROM actions WHERE tool='write_file'").fetchone()
+    assert act["status"] == "SUCCEEDED"
+    assert (tmp_workspace / "src" / "new.py").read_text(encoding="utf-8") == "x"
+    conn.close()
