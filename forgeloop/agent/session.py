@@ -1,0 +1,28 @@
+from __future__ import annotations
+from enum import Enum
+
+
+class SessionStatus(str, Enum):
+    RUNNING = "RUNNING"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    PAUSED = "PAUSED"
+    COMPLETED = "COMPLETED"
+    COMPLETED_WITH_FAILURE = "COMPLETED_WITH_FAILURE"
+    FAILED_PARSE = "FAILED_PARSE"
+    STOPPED_FAILURE_BREAKER = "STOPPED_FAILURE_BREAKER"
+    STOPPED_LOOP = "STOPPED_LOOP"
+    STOPPED_MAX_ROUNDS = "STOPPED_MAX_ROUNDS"
+    STOPPED_APPROVAL_TIMEOUT = "STOPPED_APPROVAL_TIMEOUT"
+    ABORTED = "ABORTED"
+
+
+TERMINAL_STATUSES = {
+    SessionStatus.COMPLETED, SessionStatus.COMPLETED_WITH_FAILURE,
+    SessionStatus.FAILED_PARSE, SessionStatus.STOPPED_FAILURE_BREAKER,
+    SessionStatus.STOPPED_LOOP, SessionStatus.STOPPED_MAX_ROUNDS,
+    SessionStatus.STOPPED_APPROVAL_TIMEOUT, SessionStatus.ABORTED,
+}
+
+
+def is_terminal(status: str) -> bool:
+    return status in {s.value for s in TERMINAL_STATUSES}
