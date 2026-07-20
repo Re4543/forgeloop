@@ -1,0 +1,5 @@
+FAILED tests/test_foo.py::test_foo - AssertionError: assert 1 == 2
+FAILED tests/test_bar.py::test_bar - ModuleNotFoundError: No module named 'frob'
+
+==== short test summary info ====
+2 failed, 10 passed in 3.2s

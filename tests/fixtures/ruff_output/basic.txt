@@ -1,0 +1,2 @@
+src/a.py:3:5: F841 local variable x is unused
+src/b.py:10:1: E302 expected 2 blank lines

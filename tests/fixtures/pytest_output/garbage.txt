@@ -1,0 +1,2 @@
+this is not pytest output at all
+random text without summary line

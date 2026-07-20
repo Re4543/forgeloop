@@ -1,0 +1,1 @@
+ERROR collecting tests/test_bad.py
