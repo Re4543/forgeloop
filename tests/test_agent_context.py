@@ -11,8 +11,10 @@ def test_context_has_system_user_memory_feedback():
 
 
 def test_context_includes_feedback():
-    msgs = build_context(task="x", history=[], memory_entries=[], feedback_text="[FEEDBACK] FAILED", parse_error_text=None)
-    assert any("[FEEDBACK]" in m.content for m in msgs)
+    hist = [Message(role="user", content="[FEEDBACK] FAILED")]
+    msgs = build_context(task="x", history=hist, memory_entries=[], feedback_text="[FEEDBACK] FAILED", parse_error_text=None)
+    feedback_count = sum(1 for m in msgs if "[FEEDBACK]" in m.content)
+    assert feedback_count == 1
 
 
 def test_context_includes_parse_error():

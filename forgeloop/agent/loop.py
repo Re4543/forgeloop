@@ -88,6 +88,7 @@ class AgentLoop:
                 self._consec_fail += 1
                 self._history.append(Message(role="user", content=f"[BLOCKED] action denied by guardrail: {decision.reason} (rule: {decision.rule_id})"))
                 self._last_feedback = None
+                self._round += 1
                 st = self._check_and_update()
                 if st != "RUNNING":
                     return st
@@ -102,6 +103,7 @@ class AgentLoop:
                     self._consec_fail += 1
                     self._history.append(Message(role="user", content="[DENIED] user denied your action."))
                     self._last_feedback = None
+                    self._round += 1
                     st = self._check_and_update()
                     if st != "RUNNING":
                         return st
@@ -117,6 +119,8 @@ class AgentLoop:
             done_called = action.tool == "done" and result.ok
             done_success = done_called and result.result.get("success", False) if result.result else False
             st = self._check_and_update(done_called=done_called, done_success=done_success)
+            if done_called and st == "RUNNING":
+                self._history.append(Message(role="user", content="[BLOCKED] done rejected: tests are failing, fix them before calling done"))
             if st != "RUNNING":
                 return st
 

@@ -25,8 +25,6 @@ def build_context(task: str, history: list[Message], memory_entries: list[str], 
     if len(history) > max_history_turns:
         history = history[-max_history_turns:]
     msgs.extend(history)
-    if feedback_text:
-        msgs.append(Message(role="user", content=feedback_text))
     if parse_error_text:
         msgs.append(Message(role="user", content=f"上一条输出无法解析为合法动作。请只输出一个 JSON 对象。上次错误：{parse_error_text}"))
     return msgs

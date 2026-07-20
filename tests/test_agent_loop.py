@@ -118,3 +118,57 @@ def test_loop_requireapproval_auto_proceeds(tmp_workspace):
     assert act["status"] == "SUCCEEDED"
     assert (tmp_workspace / "src" / "new.py").read_text(encoding="utf-8") == "x"
     conn.close()
+
+
+class _HardBreakerResetMock:
+    def __init__(self):
+        self.count = 0
+
+    def __call__(self, messages, config):
+        self.count += 1
+        if self.count == 1:
+            return '{"thought":"r","tool":"read_file","args":{"path":"missing.py"}}'
+        if self.count == 2:
+            return '{"thought":"r","tool":"read_file","args":{"path":"src/main.py"}}'
+        if self.count == 3:
+            return '{"thought":"r","tool":"read_file","args":{"path":"missing.py"}}'
+        return '{"thought":"done","tool":"done","args":{"summary":"ok","success":true}}'
+
+
+def test_hard_breaker_resets_on_success(tmp_workspace):
+    conn = connect(tmp_workspace / "t.db")
+    init_schema(conn)
+    cfg = load_config([])
+    cfg.workspace_root = str(tmp_workspace)
+    cfg.done_post_check["require_green_tests"] = False
+    mock = MockLLMProvider(responses=_HardBreakerResetMock())
+    loop = AgentLoop(llm=mock, llm_config=LLMConfig(model="mock"), config=cfg, registry=_registry(), conn=conn, workspace_root=str(tmp_workspace), task="x", max_rounds=10)
+    status = loop.run()
+    assert status != "STOPPED_FAILURE_BREAKER"
+    conn.close()
+
+
+class _ParseRetryMock:
+    def __init__(self):
+        self.count = 0
+
+    def __call__(self, messages, config):
+        self.count += 1
+        if self.count == 1:
+            return "this is garbage not json"
+        if self.count == 2:
+            return '{"thought":"list","tool":"list_dir","args":{"path":"."}}'
+        return '{"thought":"done","tool":"done","args":{"summary":"ok","success":true}}'
+
+
+def test_parse_retry_within_turn(tmp_workspace):
+    conn = connect(tmp_workspace / "t.db")
+    init_schema(conn)
+    cfg = load_config([])
+    cfg.workspace_root = str(tmp_workspace)
+    cfg.done_post_check["require_green_tests"] = False
+    mock = MockLLMProvider(responses=_ParseRetryMock())
+    loop = AgentLoop(llm=mock, llm_config=LLMConfig(model="mock"), config=cfg, registry=_registry(), conn=conn, workspace_root=str(tmp_workspace), task="x")
+    status = loop.run()
+    assert status == "COMPLETED"
+    conn.close()
