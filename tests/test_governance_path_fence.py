@@ -27,7 +27,7 @@ def test_symlink_escape_denied(tmp_workspace):
 
 def test_read_allowlist(tmp_workspace):
     allowlisted = tmp_workspace.parent / "allowlisted"
-    allowlisted.mkdir()
+    allowlisted.mkdir(exist_ok=True)
     target = str(allowlisted / "foo")
     r = fence_path(target, str(tmp_workspace), mode="read", read_allowlist=[str(allowlisted)])
     assert r.allowed is True
