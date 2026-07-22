@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from forgeloop.server.auth import verify_token, create_auth_dependency
+from forgeloop.server.auth import verify_token, create_auth_dependency, register_auth_handler
 from forgeloop.config.app_config import ServerConfig
 
 
 def _app(secret: str):
     app = FastAPI()
+    register_auth_handler(app)
     dep = create_auth_dependency(secret)
     @app.get("/protected")
     async def protected(_=dep):
@@ -18,7 +19,7 @@ def test_no_token_returns_401():
     client = TestClient(app)
     resp = client.get("/protected")
     assert resp.status_code == 401
-    assert resp.json() == {"detail": {"error": "unauthorized"}}
+    assert resp.json() == {"error": "unauthorized"}
 
 
 def test_wrong_token_returns_401():
