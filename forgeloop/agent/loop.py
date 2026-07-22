@@ -97,8 +97,8 @@ class AgentLoop:
                 update_action(self._conn, action_row.id, status="PENDING_APPROVAL", guardrail_decision=json.dumps({"verdict": "RequireApproval", "rule_id": decision.rule_id, "reason": decision.reason}))
                 ar = self._fsm.request(action_id=action_row.id, session_id=self._session_id)
                 update_session_status(self._conn, self._session_id, "PENDING_APPROVAL")
-                self._await_approval(ar.id)
-                if self._fsm_denied(ar.id):
+                approval_result = self._await_approval(ar.id)
+                if approval_result == "denied":
                     update_action(self._conn, action_row.id, status="DENIED", finished_at=_now())
                     self._consec_fail += 1
                     self._history.append(Message(role="user", content="[DENIED] user denied your action."))
@@ -108,6 +108,10 @@ class AgentLoop:
                     if st != "RUNNING":
                         return st
                     continue
+                elif approval_result == "timeout":
+                    update_action(self._conn, action_row.id, status="TIMEOUT", finished_at=_now())
+                    update_session_status(self._conn, self._session_id, "STOPPED_APPROVAL_TIMEOUT", finished_at=_now())
+                    return "STOPPED_APPROVAL_TIMEOUT"
                 update_action(self._conn, action_row.id, status="APPROVED")
                 update_session_status(self._conn, self._session_id, "RUNNING")
                 result = self._registry.dispatch(action, ctx={"workspace_root": self._workspace_root, "read_allowlist": self._config.path_fencing.get("read_allowlist", [])})
@@ -160,9 +164,17 @@ class AgentLoop:
             update_session_status(self._conn, self._session_id, st, finished_at=_now() if st.startswith("COMPLETED") else None)
         return st
 
-    def _await_approval(self, ar_id: str) -> None:
-        pass
-
-    def _fsm_denied(self, ar_id: str) -> bool:
-        row = self._conn.execute("SELECT status FROM approval_requests WHERE id=?", (ar_id,)).fetchone()
-        return bool(row and row["status"] == "DENIED")
+    def _await_approval(self, ar_id: str, poll_interval: float = 2.0) -> str:
+        import time
+        while True:
+            row = self._conn.execute("SELECT status FROM approval_requests WHERE id=?", (ar_id,)).fetchone()
+            if not row:
+                return "denied"
+            status = row["status"]
+            if status == "APPROVED":
+                return "approved"
+            if status == "DENIED":
+                return "denied"
+            if status == "TIMEOUT":
+                return "timeout"
+            time.sleep(poll_interval)

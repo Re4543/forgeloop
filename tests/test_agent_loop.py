@@ -109,11 +109,26 @@ def test_loop_requireapproval_auto_proceeds(tmp_workspace):
         '{"thought":"done","tool":"done","args":{"summary":"ok","success":true}}',
     ])
     loop = AgentLoop(llm=mock, llm_config=LLMConfig(model="mock"), config=cfg, registry=_registry(), conn=conn, workspace_root=str(tmp_workspace), task="write then done")
+
+    import threading, time
+    from forgeloop.governance.approval import ApprovalFSM
+
+    def _approver():
+        for _ in range(100):
+            row = conn.execute("SELECT id FROM approval_requests WHERE status='PENDING'").fetchone()
+            if row:
+                ApprovalFSM(conn).approve(row["id"])
+                return
+            time.sleep(0.05)
+
+    t = threading.Thread(target=_approver)
+    t.start()
     status = loop.run()
+    t.join(timeout=5)
     assert status == "COMPLETED"
     ar = conn.execute("SELECT status FROM approval_requests").fetchall()
     assert len(ar) == 1
-    assert ar[0]["status"] == "PENDING"
+    assert ar[0]["status"] == "APPROVED"
     act = conn.execute("SELECT status FROM actions WHERE tool='write_file'").fetchone()
     assert act["status"] == "SUCCEEDED"
     assert (tmp_workspace / "src" / "new.py").read_text(encoding="utf-8") == "x"
