@@ -31,7 +31,7 @@ def _registry():
 
 
 def _make_loop(tmp_workspace):
-    conn = connect(tmp_workspace / "t.db")
+    conn = connect(tmp_workspace / "t.db", check_same_thread=False)
     init_schema(conn)
     cfg = load_config([])
     cfg.workspace_root = str(tmp_workspace)

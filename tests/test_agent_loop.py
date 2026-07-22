@@ -99,7 +99,7 @@ def test_loop_guardrail_deny_breaker(tmp_workspace):
 
 
 def test_loop_requireapproval_auto_proceeds(tmp_workspace):
-    conn = connect(tmp_workspace / "t.db")
+    conn = connect(tmp_workspace / "t.db", check_same_thread=False)
     init_schema(conn)
     cfg = load_config([])
     cfg.workspace_root = str(tmp_workspace)
