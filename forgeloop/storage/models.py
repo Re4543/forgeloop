@@ -153,3 +153,43 @@ def update_approval_request(conn: sqlite3.Connection, arid: str, **fields) -> No
 def list_pending_approvals(conn: sqlite3.Connection) -> list[ApprovalRequest]:
     rows = conn.execute("SELECT * FROM approval_requests WHERE status='PENDING'").fetchall()
     return [_row_to(ApprovalRequest, r) for r in rows]
+
+
+def list_sessions(conn: sqlite3.Connection) -> list[Session]:
+    rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC").fetchall()
+    return [_row_to(Session, r) for r in rows]
+
+
+def get_turns_for_session(conn: sqlite3.Connection, sid: str) -> list[Turn]:
+    rows = conn.execute("SELECT * FROM turns WHERE session_id=? ORDER BY turn_index", (sid,)).fetchall()
+    return [_row_to(Turn, r) for r in rows]
+
+
+def get_actions_for_turn(conn: sqlite3.Connection, turn_id: str) -> list[Action]:
+    rows = conn.execute("SELECT * FROM actions WHERE turn_id=? ORDER BY created_at", (turn_id,)).fetchall()
+    return [_row_to(Action, r) for r in rows]
+
+
+def get_actions_for_session(conn: sqlite3.Connection, sid: str) -> list[Action]:
+    rows = conn.execute("SELECT * FROM actions WHERE session_id=? ORDER BY created_at", (sid,)).fetchall()
+    return [_row_to(Action, r) for r in rows]
+
+
+def get_action(conn: sqlite3.Connection, aid: str) -> Action | None:
+    row = conn.execute("SELECT * FROM actions WHERE id=?", (aid,)).fetchone()
+    return _row_to(Action, row) if row else None
+
+
+def get_approval_request(conn: sqlite3.Connection, arid: str) -> ApprovalRequest | None:
+    row = conn.execute("SELECT * FROM approval_requests WHERE id=?", (arid,)).fetchone()
+    return _row_to(ApprovalRequest, row) if row else None
+
+
+def list_memory(conn: sqlite3.Connection, workspace_root: str) -> list:
+    from forgeloop.storage.memory import MemoryEntry
+    rows = conn.execute("SELECT * FROM memory WHERE workspace_root=? ORDER BY updated_at DESC", (workspace_root,)).fetchall()
+    return [_row_to(MemoryEntry, r) for r in rows]
+
+
+def abort_session(conn: sqlite3.Connection, sid: str) -> None:
+    update_session_status(conn, sid, "ABORTED", finished_at=_now())
