@@ -3,6 +3,7 @@ import json
 import sqlite3
 from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from forgeloop.config.app_config import AppConfig
 from forgeloop.storage.db import connect, init_schema
@@ -33,6 +34,12 @@ def create_app(config: AppConfig, db_path: Path) -> FastAPI:
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         return JSONResponse(status_code=500, content={"error": redact(str(exc))})
+
+    @app.exception_handler(FastAPIHTTPException)
+    async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
+        if isinstance(exc.detail, dict) and "error" in exc.detail:
+            return JSONResponse(status_code=exc.status_code, content={"error": exc.detail["error"]})
+        return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail)})
 
     @app.get("/", response_class=HTMLResponse)
     async def root(_=auth):

@@ -86,6 +86,7 @@ def test_get_session_404(tmp_path):
     client, _ = _make_client(tmp_path)
     resp = client.get("/sessions/nonexistent", headers={"Authorization": "Bearer test-secret"})
     assert resp.status_code == 404
+    assert resp.json() == {"error": "session not found"}
 
 
 def test_get_memory(tmp_path):
@@ -125,6 +126,13 @@ def test_unauthorized_no_token(tmp_path):
     client, _ = _make_client(tmp_path)
     resp = client.get("/sessions")
     assert resp.status_code == 401
+
+
+def test_unauthorized_wrong_token(tmp_path):
+    client, _ = _make_client(tmp_path)
+    resp = client.get("/sessions", headers={"Authorization": "Bearer wrong-secret"})
+    assert resp.status_code == 401
+    assert resp.json() == {"error": "unauthorized"}
 
 
 def test_get_root_html(tmp_path):
