@@ -68,12 +68,13 @@ forgeloop run --task "fix the failing tests" [OPTIONS]
 2. Load `forgeloop.yaml` (CLI flags override config values).
 3. Init SQLite DB (`forgeloop.db` in workspace root) with `init_schema()`.
 4. Set `PRAGMA journal_mode=WAL` on the DB connection.
-5. Start uvicorn in background thread (FastAPI app, bound to host:port).
-6. Start timeout sweeper in background thread.
-7. Print WebUI URL + shared secret to terminal.
-8. Create Session row in DB (status=RUNNING).
-9. Run `AgentLoop.run()` in main thread (blocks until terminal status).
-10. Print final status, exit.
+5. Scan for sessions with `status=PENDING_APPROVAL` (crash recovery). If found, print warning with session ID.
+6. Start uvicorn in background thread (FastAPI app, bound to host:port).
+7. Start timeout sweeper in background thread.
+8. Print WebUI URL + shared secret to terminal.
+9. Create Session row in DB (status=RUNNING).
+10. Run `AgentLoop.run()` in main thread (blocks until terminal status).
+11. Print final status, exit.
 
 **No other subcommands.** Session listing, approval, abort, credentials, memory — all via WebUI.
 
@@ -234,7 +235,8 @@ guardrail → RequireApproval
       SELECT status, deny_reason FROM approval_requests WHERE id=?
       ├ PENDING  → sleep 2s, poll again
       ├ APPROVED → Session.status=RUNNING, return "approved"
-      └ DENIED   → Session.status=RUNNING, return "denied"
+      ├ DENIED   → Session.status=RUNNING, return "denied"
+      └ TIMEOUT  → Session.status=STOPPED_APPROVAL_TIMEOUT, return "timeout"
   → timeout sweeper (bg thread, 60s interval):
       SELECT * FROM approval_requests
       WHERE status='PENDING'
