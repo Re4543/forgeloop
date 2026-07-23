@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ForgeLoop</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.header h1 { font-size: 1.5rem; }
+.tabs { display: flex; gap: 10px; }
+.tab { padding: 8px 16px; background: #2a2a2a; border: 1px solid #444; cursor: pointer; border-radius: 4px; }
+.tab.active { background: #3a3a3a; border-color: #666; }
+.content { background: #2a2a2a; border: 1px solid #444; border-radius: 4px; padding: 16px; min-height: 400px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #444; }
+th { color: #888; font-size: 0.85rem; text-transform: uppercase; }
+.btn { padding: 6px 12px; border: 1px solid #666; background: #333; color: #e0e0e0; cursor: pointer; border-radius: 4px; }
+.btn:hover { background: #444; }
+.btn-approve { border-color: #4a4; color: #4f4; }
+.btn-deny { border-color: #a44; color: #f44; }
+input, textarea { background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; padding: 6px; border-radius: 4px; width: 100%; }
+.turn { margin-bottom: 12px; padding: 8px; background: #222; border-radius: 4px; }
+.turn-header { font-size: 0.85rem; color: #888; margin-bottom: 4px; }
+.action { padding: 4px 8px; margin: 4px 0; background: #1a1a1a; border-radius: 4px; font-size: 0.9rem; }
+.status-SUCCEEDED { color: #4f4; }
+.status-FAILED { color: #f44; }
+.status-PENDING_APPROVAL { color: #ff4; }
+.status-BLOCKED_BY_GUARDRAIL { color: #f84; }
+.status-APPROVED { color: #4f4; }
+.status-DENIED { color: #f44; }
+.status-EXECUTING { color: #4ff; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="header">
+<h1>ForgeLoop</h1>
+<div class="tabs">
+<div class="tab active" onclick="showTab('sessions')">Sessions</div>
+<div class="tab" onclick="showTab('approvals')">Approvals</div>
+<div class="tab" onclick="showTab('memory')">Memory</div>
+</div>
+</div>
+<div class="content">
+<div id="sessions-tab">
+<div style="margin-bottom:12px;">
+<input type="text" id="new-task" placeholder="Task description..." style="width:60%;">
+<button class="btn" onclick="startSession()">Start</button>
+</div>
+<table>
+<thead><tr><th>ID</th><th>Status</th><th>Task</th><th>Created</th><th></th></tr></thead>
+<tbody id="sessions-list"></tbody>
+</table>
+<div id="session-detail" class="hidden"></div>
+</div>
+<div id="approvals-tab" class="hidden">
+<div id="approvals-list"></div>
+</div>
+<div id="memory-tab" class="hidden">
+<input type="text" id="mem-keyword" placeholder="Search keyword..." style="width:50%; margin-bottom:12px;" oninput="loadMemory()">
+<div id="memory-list"></div>
+</div>
+</div>
+<script>
+let token = sessionStorage.getItem('forgeloop-secret') || '';
+if (!token) { token = prompt('Enter secret:'); sessionStorage.setItem('forgeloop-secret', token); }
+function headers() { return {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}; }
+function showTab(name) {
+document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+event.target.classList.add('active');
+document.querySelectorAll('[id$="-tab"]').forEach(t => t.classList.add('hidden'));
+document.getElementById(name + '-tab').classList.remove('hidden');
+}
+async function loadSessions() {
+const r = await fetch('/sessions', {headers: headers()});
+const data = await r.json();
+const tbody = document.getElementById('sessions-list');
+tbody.innerHTML = data.map(s => `<tr><td>${s.id.slice(0,8)}</td><td class="status-${s.status}">${s.status}</td><td>${s.task}</td><td>${s.created_at}</td><td><button class="btn" onclick="loadSession('${s.id}')">View</button> <button class="btn btn-deny" onclick="abortSession('${s.id}')">Abort</button></td></tr>`).join('');
+}
+async function loadSession(id) {
+const r = await fetch('/sessions/' + id, {headers: headers()});
+const s = await r.json();
+const detail = document.getElementById('session-detail');
+detail.classList.remove('hidden');
+detail.innerHTML = `<h3>Session ${s.id.slice(0,8)} — ${s.status}</h3><p>Task: ${s.task}</p>` + s.turns.map(t => `<div class="turn"><div class="turn-header">Turn ${t.round} — ${t.parse_status}</div>${(t.actions||[]).map(a => `<div class="action"><span class="status-${a.status}">${a.status}</span> <b>${a.tool}</b> ${JSON.stringify(a.args||{})}<br><span style="color:#888;">${a.thought||''}</span>${a.result?'<br><pre>'+JSON.stringify(a.result,null,2)+'</pre>':''}${a.feedback_signal?'<br><span style="color:#ff4;">[FEEDBACK]</span> '+JSON.stringify(a.feedback_signal):''}</div>`).join('')}</div>`).join('');
+}
+async function startSession() {
+const task = document.getElementById('new-task').value;
+if (!task) return;
+const r = await fetch('/sessions', {method:'POST', headers: headers(), body: JSON.stringify({task})});
+const data = await r.json();
+loadSessions();
+}
+async function abortSession(id) {
+await fetch('/sessions/'+id+'/abort', {method:'POST', headers: headers()});
+loadSessions();
+}
+async function loadApprovals() {
+const r = await fetch('/approvals', {headers: headers()});
+const data = await r.json();
+const list = document.getElementById('approvals-list');
+list.innerHTML = data.map(a => `<div class="action"><b>${a.action?a.action.tool:'?'}</b> ${a.action?JSON.stringify(a.action.args||{}):''}<br><span style="color:#888;">${a.action?a.action.thought:''}</span><br><button class="btn btn-approve" onclick="decideApproval('${a.id}','approve')">Approve</button> <input type="text" id="deny-reason-${a.id}" placeholder="Reason..." style="width:40%;"><button class="btn btn-deny" onclick="decideApproval('${a.id}','deny')">Deny</button></div>`).join('') || '<p>No pending approvals</p>';
+}
+async function decideApproval(id, verdict) {
+const reason = document.getElementById('deny-reason-'+id)?.value || null;
+await fetch('/approvals/'+id+'/decision', {method:'POST', headers: headers(), body: JSON.stringify({verdict, reason})});
+loadApprovals();
+}
+async function loadMemory() {
+const kw = document.getElementById('mem-keyword').value;
+const url = kw ? '/memory?keyword='+encodeURIComponent(kw) : '/memory';
+const r = await fetch(url, {headers: headers()});
+const data = await r.json();
+const list = document.getElementById('memory-list');
+list.innerHTML = data.map(m => `<div class="action"><b>[${m.kind}]</b> ${m.content}<br><span style="color:#888;">${m.tags||''} ${m.updated_at}</span></div>`).join('') || '<p>No memory entries</p>';
+}
+loadSessions();
+loadApprovals();
+setInterval(loadSessions, 3000);
+setInterval(loadApprovals, 3000);
+</script>
+</body>
+</html>
