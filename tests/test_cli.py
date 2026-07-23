@@ -7,7 +7,7 @@ from forgeloop.cli import parse_args
 def test_parse_args_defaults():
     args = parse_args(["run", "--task", "fix tests"])
     assert args.task == "fix tests"
-    assert args.workspace == "."
+    assert args.workspace is None
     assert args.config == "./forgeloop.yaml"
     assert args.host is None
     assert args.port is None

@@ -8,7 +8,6 @@ from pathlib import Path
 
 from forgeloop.config.app_config import load_app_config
 from forgeloop.storage.db import connect, init_schema
-from forgeloop.storage.models import get_session
 from forgeloop.agent.loop import AgentLoop
 from forgeloop.agent.session import is_terminal
 from forgeloop.config.loader import GuardrailsConfig
@@ -29,7 +28,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     sub = parser.add_subparsers(dest="command", required=True)
     run_p = sub.add_parser("run")
     run_p.add_argument("--task", required=True)
-    run_p.add_argument("--workspace", default=".")
+    run_p.add_argument("--workspace", default=None)
     run_p.add_argument("--config", default="./forgeloop.yaml")
     run_p.add_argument("--host", default=None)
     run_p.add_argument("--port", type=int, default=None)
@@ -59,14 +58,14 @@ def main() -> int:
         return 1
 
     cli_overrides = {}
-    if args.host:
-        cli_overrides["host"] = args.host
-    if args.port:
-        cli_overrides["port"] = args.port
-    if args.max_rounds:
-        cli_overrides["max_rounds"] = args.max_rounds
-    if args.workspace:
+    if args.workspace is not None:
         cli_overrides["workspace"] = args.workspace
+    if args.host is not None:
+        cli_overrides["host"] = args.host
+    if args.port is not None:
+        cli_overrides["port"] = args.port
+    if args.max_rounds is not None:
+        cli_overrides["max_rounds"] = args.max_rounds
 
     config_path = Path(args.config)
     config = load_app_config(config_path if config_path.exists() else None, cli_overrides)
