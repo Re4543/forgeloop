@@ -1,0 +1,31 @@
+stages:
+  - test
+  - build
+
+unit-test:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - pip install --no-cache-dir -e ".[dev]"
+  script:
+    - python -m pytest -v --tb=short
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+
+build-image:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker build -t forgeloop:latest .
+    - docker tag forgeloop:latest $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker tag forgeloop:latest $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  dependencies:
+    - unit-test
