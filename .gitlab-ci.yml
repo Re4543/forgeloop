@@ -12,6 +12,19 @@ unit-test:
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
 
+credential-scan:
+  stage: test
+  image: alpine:latest
+  script:
+    - |
+      if grep -rE 'sk-[A-Za-z0-9]{20,}' --include='*.py' --include='*.yaml' --include='*.yml' --include='*.md' . ; then
+        echo "ERROR: API key pattern found in source files"
+        exit 1
+      fi
+    - echo "No credentials found in source files"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+
 build-image:
   stage: build
   image: docker:24

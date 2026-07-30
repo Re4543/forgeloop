@@ -20,6 +20,19 @@ jobs:
       - name: Run tests
         run: python -m pytest -v --tb=short
 
+  credential-scan:
+    name: Credential Leak Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for API keys in source
+        run: |
+          if grep -rE 'sk-[A-Za-z0-9]{20,}' --include='*.py' --include='*.yaml' --include='*.yml' --include='*.md' . ; then
+            echo "ERROR: API key pattern found in source files"
+            exit 1
+          fi
+          echo "No credentials found in source files"
+
   build-image:
     name: Build Docker Image
     runs-on: ubuntu-latest

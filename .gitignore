@@ -26,3 +26,7 @@ Thumbs.db
 
 # Local runtime state
 *.log
+
+# Local config (contains secrets)
+forgeloop.yaml
+forgeloop.db*

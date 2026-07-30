@@ -79,7 +79,46 @@ E2E 测试中直接构造 `GuardrailsConfig(workspace_root=...)` 会导致 `rule
 
 ## 4. 冷启动验证记录
 
-（待用户填写 — 需用不同 agent 类型进行冷启动测试）
+### 4.1 验证环境
+
+- **验证 agent**：非 OpenCode 的另一 agent 类型，全新 session
+- **提供文档**：SPEC.md + PLAN.md（项目根目录）
+- **验证时间**：2026-07-30
+
+### 4.2 阻断性问题
+
+**问题 A：PLAN.md 是索引而非自包含文档**
+
+冷启动 agent 发现 PLAN.md 只是指向 `docs/superpowers/plans/` 下两份详细计划文件的索引，不包含 task 定义。agent 无法仅凭 PLAN.md 获得足够的实现信息。
+
+**分析**：spec 缺陷。PLAN.md 应自包含 task 定义（目标 / 文件路径 / 实现要点 / 验证步骤），或至少在文档中明确指向详细计划文件。
+
+**修正**：在 PLAN.md 中明确标注详细计划文件路径，并在冷启动提示词中说明"PLAN.md 引用的详细计划文件也在仓库内，可读取"。
+
+**问题 B：所有 task 已标记 complete**
+
+冷启动 agent 发现 PLAN.md 中 34 个 task 全部标记 ✅ complete，无法"选前 2 个无依赖 task"实现。
+
+**分析**：流程错误。冷启动验证（Stage 3）应在实现（Stage 4）之前进行，但实际执行顺序是先实现后验证。不过 agent 在 C 表发现的不一致仍然有价值的发现。
+
+**修正**：记录此次验证为"回顾性冷启动"——验证 spec 的清晰度而非实现新 task。agent 的发现（C 表）已逐条修复。
+
+### 4.3 文档-代码不一致（C 表）
+
+| # | 位置 | 问题 | 判定 | 修正 |
+|---|------|------|------|------|
+| 1 | SPEC.md:740 vs sweeper.py:43 | ApprovalRequest 状态 spec 写 EXPIRED，代码用 TIMEOUT | spec 缺陷 | SPEC.md 改为 TIMEOUT |
+| 2 | SPEC.md:345 vs server/app.py:66 | POST /sessions 写 status="QUEUED"，不在状态机枚举内，无消费者 | spec 缺陷 | SPEC.md 标注 PAUSED 为预留状态；POST /sessions 的 QUEUED 限制记录在 README 已知限制中 |
+| 3 | SPEC.md:797 (T8.1) | 要求 CI grep 扫 sk- 模式，CI 配置中无此 job | spec 缺陷 | 在 .gitlab-ci.yml 和 .github/workflows/ci.yml 中添加 credential-scan job |
+| 4 | SPEC.md:841 (R4) | 缓解措施列了"限速"，代码中无 rate limiting | spec 过度承诺 | SPEC.md 改为"文档推荐反代+TLS+限速；v1 未实现限速，列为已知限制" |
+| 5 | SPEC.md:344 | PAUSED 是合法非终态，但无暂停/恢复端点 | spec 缺陷 | SPEC.md 标注 PAUSED 为预留状态，当前实现无暂停/恢复端点 |
+
+### 4.4 教训
+
+1. **冷启动验证必须在实现前做**——否则无法验证 spec 的可实现性
+2. **PLAN.md 必须自包含**——不能依赖外部文件的索引
+3. **spec 中的状态枚举必须与代码一致**——EXPIRED vs TIMEOUT 是典型的设计→实现漂移
+4. **spec 不应过度承诺**——"限速"写在 spec 里但未实现，冷启动 agent 正确地发现了这个不一致
 
 ## 5. 反思
 

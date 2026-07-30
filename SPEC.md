@@ -341,7 +341,7 @@ RUNNING ──action 需审批──> PENDING_APPROVAL ──批准──> RUNNI
    └──满足 1-5 任一──> 终态(见上表)
 ```
 
-非终态：`RUNNING` / `PENDING_APPROVAL` / `PAUSED`
+非终态：`RUNNING` / `PENDING_APPROVAL` / `PAUSED`（注：`PAUSED` 为预留状态，当前实现无暂停/恢复端点；`resume` 子命令处理的是 `PENDING_APPROVAL`）
 终态：`COMPLETED` / `COMPLETED_WITH_FAILURE` / `FAILED_PARSE` / `STOPPED_FAILURE_BREAKER` / `STOPPED_LOOP` / `STOPPED_MAX_ROUNDS` / `STOPPED_APPROVAL_TIMEOUT` / `ABORTED`
 
 ### 6.5 可测试断言
@@ -737,7 +737,7 @@ workspace_root 1──N MemoryEntry (project-scoped, session_id nullable)
 | id | TEXT PK | uuid |
 | action_id | TEXT FK UNIQUE | 一对一 |
 | session_id | TEXT FK | |
-| status | TEXT | PENDING/APPROVED/DENIED/EXPIRED |
+| status | TEXT | PENDING/APPROVED/DENIED/TIMEOUT |
 | requested_at / decided_at | TEXT | |
 | decided_by | TEXT | "webui" |
 | deny_reason | TEXT | 用户拒绝理由 |
@@ -838,7 +838,7 @@ workspace_root 1──N MemoryEntry (project-scoped, session_id nullable)
 | R1 | pytest stdout 解析脆弱（版本变更破坏正则） | 反馈信号降级 raw | 测试 pin pytest 版本；解析失败降级 raw 不阻塞；文档说明 |
 | R2 | LLM 输出格式漂移（模型更新降低 JSON 可靠性） | parse 失败增多 | 三级解析 + 熔断；系统提示强约束输出格式 |
 | R3 | Windows 路径围栏边界（大小写/盘符/junction） | 越界写漏拦 | 大量 win32 路径测试；realpath + commonpath + lower-case |
-| R4 | WebUI 公网暴露（bearer token 暴力破解） | 未授权审批 | 限速；文档推荐反代 + TLS；长随机 token |
+| R4 | WebUI 公网暴露（bearer token 暴力破解） | 未授权审批 | 文档推荐反代 + TLS + 限速；长随机 token（64 字符）；v1 未实现限速，列为已知限制 |
 | R5 | 审批队列阻塞（用户离线） | agent 挂起 | 24h 超时停机；WebUI 可中止 |
 | R6 | 记忆检索质量弱（LIKE 关键词） | 注入无关记忆 | v1 可接受；文档列为已知限制；v2 可加 embedding |
 | R7 | token 成本失控 | 烧钱 | MAX_ROUNDS 上限；输出截断；熔断 |
