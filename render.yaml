@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: forgeloop
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: FORGELOOP_HOST
+        value: 0.0.0.0
+      - key: FORGELOOP_PORT
+        value: "8000"
+      - key: OPENAI_API_KEY
+        sync: false
+    healthCheckPath: /
+    autoDeploy: true

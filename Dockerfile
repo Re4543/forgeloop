@@ -12,13 +12,11 @@ LABEL org.opencontainers.image.description="Self-built coding agent harness with
 LABEL org.opencontainers.image.source="https://github.com/Re4543/forgeloop"
 
 RUN useradd --create-home --shell /bin/bash forgeloop
+
+COPY --from=builder --chown=forgeloop:forgeloop /wheels/*.whl /tmp/
+RUN pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
+
 USER forgeloop
-WORKDIR /home/forgeloop
-
-COPY --from=builder /wheels/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl && rm /tmp/*.whl
-
-RUN mkdir -p /home/forgeloop/workspace
 WORKDIR /home/forgeloop/workspace
 
 EXPOSE 8000
