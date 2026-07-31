@@ -28,7 +28,7 @@ ForgeLoop 是一个自研的 Coding Agent Harness：把"只会决定下一步做
 
 | 决策 | 取值 | 理由 |
 |---|---|---|
-| WebUI 用户模型 | **单用户 + 共享密钥鉴权** | 课程项目够用；公网暴露但所有端点需 bearer token；避免任何访客审批动作；API key 全局单个（owner 的） |
+| WebUI 用户模型 | **单用户 + 共享密钥鉴权** | 课程项目够用；公网暴露但所有数据端点需 bearer token（`GET /` 除外：浏览器导航无法携带 Authorization 头，故静态页外壳免鉴权，其自身不含任何数据或密钥，加载后由前端提示输入 secret）；避免任何访客审批动作；API key 全局单个（owner 的） |
 | LLM 供应商范围 | **仅 OpenAI 兼容 API** | 一个适配器覆盖 OpenAI/DeepSeek/Moonshot/本地 vLLM/Ollama；与"自定义 JSON schema 从文本解析"天然契合；只管一个 key |
 
 ## 3. 系统架构总览

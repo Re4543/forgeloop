@@ -140,3 +140,11 @@ def test_get_root_html(tmp_path):
     resp = client.get("/", headers={"Authorization": "Bearer test-secret"})
     assert resp.status_code == 200
     assert "text/html" in resp.headers.get("content-type", "")
+
+
+def test_get_root_html_without_token(tmp_path):
+    client, _ = _make_client(tmp_path)
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers.get("content-type", "")
+    assert "test-secret" not in resp.text

@@ -30,3 +30,5 @@ Thumbs.db
 # Local config (contains secrets)
 forgeloop.yaml
 forgeloop.db*
+
+.superpowers/
