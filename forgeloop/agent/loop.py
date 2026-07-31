@@ -15,7 +15,7 @@ from forgeloop.parser.parse import parse
 from forgeloop.parser.types import Action, ParseError
 from forgeloop.agent.context import build_context
 from forgeloop.agent.shutdown import check_shutdown, BreakerState
-from forgeloop.storage.models import Session, Turn, Action as ActionRow, create_session, create_turn, create_action, update_action, update_session_status
+from forgeloop.storage.models import Session, Turn, Action as ActionRow, create_session, create_turn, create_action, update_action, update_session_status, get_session
 from forgeloop.storage.memory import retrieve_memory
 
 
@@ -28,7 +28,7 @@ def _args_hash(action: Action) -> str:
 
 
 class AgentLoop:
-    def __init__(self, llm: LLMProvider, llm_config: LLMConfig, config: GuardrailsConfig, registry: ToolRegistry, conn: sqlite3.Connection, workspace_root: str, task: str, max_rounds: int = 50, parse_fail_limit: int = 3):
+    def __init__(self, llm: LLMProvider, llm_config: LLMConfig, config: GuardrailsConfig, registry: ToolRegistry, conn: sqlite3.Connection, workspace_root: str, task: str, max_rounds: int = 50, parse_fail_limit: int = 3, session_id: str | None = None):
         self._llm = llm
         self._llm_config = llm_config
         self._config = config
@@ -48,12 +48,16 @@ class AgentLoop:
         self._last_test_state: dict | None = None
         self._last_feedback: str | None = None
         self._last_parse_err: str | None = None
-        self._session_id = str(uuid.uuid4())
+        self._session_id = session_id or str(uuid.uuid4())
         self._turn_index = 0
 
     def run(self) -> str:
-        s = Session(id=self._session_id, task=self._task, workspace_root=self._workspace_root, status="RUNNING", created_at=_now(), updated_at=_now(), llm_config=json.dumps({"model": self._llm_config.model}))
-        create_session(self._conn, s)
+        existing = get_session(self._conn, self._session_id)
+        if existing:
+            update_session_status(self._conn, self._session_id, "RUNNING")
+        else:
+            s = Session(id=self._session_id, task=self._task, workspace_root=self._workspace_root, status="RUNNING", created_at=_now(), updated_at=_now(), llm_config=json.dumps({"model": self._llm_config.model}))
+            create_session(self._conn, s)
         while True:
             mem = retrieve_memory(self._conn, self._workspace_root, self._task.split()[:3])
             mem_texts = [f"[{m.kind}] {m.content}" for m in mem]

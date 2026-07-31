@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 import sqlite3
+import threading
 from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
@@ -41,8 +42,10 @@ def create_app(config: AppConfig, db_path: Path) -> FastAPI:
             return JSONResponse(status_code=exc.status_code, content={"error": exc.detail["error"]})
         return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail)})
 
+    # Unauthenticated: browsers can't send an Authorization header when navigating,
+    # so the shell must load before its JS can prompt for the secret. Serves no data.
     @app.get("/", response_class=HTMLResponse)
-    async def root(_=auth):
+    async def root():
         html_path = Path(__file__).parent.parent / "web" / "index.html"
         if html_path.exists():
             return HTMLResponse(html_path.read_text(encoding="utf-8"))
@@ -64,6 +67,7 @@ def create_app(config: AppConfig, db_path: Path) -> FastAPI:
         sid = f"web_{now.replace(':', '-').replace('.', '-')}"
         ws = req.workspace or config.workspace_root
         _create(db, Session(id=sid, task=req.task, workspace_root=ws, status="QUEUED", created_at=now, updated_at=now))
+        _start_agent_thread(config, db_path, sid, req.task, ws)
         return {"id": sid, "status": "QUEUED", "task": req.task}
 
     @app.get("/sessions/{sid}")
@@ -173,3 +177,60 @@ def create_app(config: AppConfig, db_path: Path) -> FastAPI:
 def _now():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
+
+
+def _start_agent_thread(config: AppConfig, db_path: Path, session_id: str, task: str, workspace: str) -> None:
+    def _run():
+        conn = connect(db_path, wal=True)
+        try:
+            from forgeloop.agent.loop import AgentLoop
+            from forgeloop.llm.base import LLMConfig
+            from forgeloop.llm.mock import MockLLMProvider
+            from forgeloop.llm.real import RealLLMProvider
+            from forgeloop.tools.base import ToolRegistry
+            from forgeloop.tools.read_file import ReadFileTool
+            from forgeloop.tools.write_file import WriteFileTool
+            from forgeloop.tools.run_shell import RunShellTool
+            from forgeloop.tools.run_tests import RunTestsTool
+            from forgeloop.tools.list_dir import ListDirTool
+            from forgeloop.tools.done import DoneTool
+
+            guardrails = config.guardrails
+            guardrails.workspace_root = workspace
+
+            if config.llm.model == "mock":
+                responses = [
+                    json.dumps({"thought": "create file", "tool": "write_file", "args": {"path": "hello.txt", "mode": "overwrite", "content": "Hello World\n"}}),
+                    json.dumps({"thought": "done", "tool": "done", "args": {"summary": "file created", "success": True}}),
+                ]
+                llm = MockLLMProvider(responses=responses)
+            else:
+                llm = RealLLMProvider()
+
+            reg = ToolRegistry()
+            for t in [ReadFileTool(), WriteFileTool(), RunShellTool(), RunTestsTool(), ListDirTool(), DoneTool()]:
+                reg.register(t)
+
+            loop = AgentLoop(
+                llm=llm,
+                llm_config=config.llm,
+                config=guardrails,
+                registry=reg,
+                conn=conn,
+                workspace_root=workspace,
+                task=task,
+                max_rounds=config.agent.max_rounds,
+                parse_fail_limit=config.agent.parse_fail_limit,
+                session_id=session_id,
+            )
+            loop.run()
+        except Exception:
+            try:
+                update_session_status(conn, session_id, "FAILED")
+            except Exception:
+                pass
+        finally:
+            conn.close()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
