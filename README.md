@@ -174,7 +174,8 @@ forgeloop/
 │       └── index.html       # 单页前端
 ├── tests/                    # 147 个测试
 ├── demo/
-│   └── mechanism_demo.py    # 三场景机制演示
+│   ├── mechanism_demo.py    # 三场景机制演示
+│   └── screenshots/         # HITL WebUI 演示截图
 ├── docs/
 │   └── superpowers/
 │       ├── specs/            # 设计规格
@@ -231,6 +232,14 @@ py -3.13 demo/mechanism_demo.py
 1. **护栏拦截危险动作**：mock 产出 `rm -rf /` 和越界写入 → Deny/拦截、动作未执行、事件已记录
 2. **反馈回灌改变下一步**：写入失败测试 → 校验器解析失败并回灌 → 修复 → 测试转绿 → COMPLETED
 3. **HITL 状态机流转**：RequireApproval → 批准执行 / 拒绝丢弃 → COMPLETED
+
+### HITL WebUI 演示截图
+
+| 步骤 | 截图 | 说明 |
+|------|------|------|
+| 1. 创建会话 | `demo/screenshots/hitl-1-sessions.png` | Sessions 标签页，点击 Start 创建会话 |
+| 2. 待审批 | `demo/screenshots/hitl-2-approval-pending.png` | Approvals 标签页，显示 write_file 待审批 |
+| 3. 审批结果 | `demo/screenshots/hitl-3-result.png` | 审批后状态变化 |
 
 ## 已知限制
 
