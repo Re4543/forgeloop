@@ -20,6 +20,12 @@ ForgeLoop 是一个自研的 Coding Agent Harness。它把"只会决定下一步
 
 ## 安装
 
+### 从 Release 安装（推荐）
+
+```bash
+pip install https://github.com/Re4543/forgeloop/releases/download/v0.1.0/forgeloop-0.1.0-py3-none-any.whl
+```
+
 ### 从源码安装
 
 ```bash
